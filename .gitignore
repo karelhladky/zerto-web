@@ -1,0 +1,9 @@
+node_modules/
+dist/
+server/data/vapid.json
+server/data/subscriptions.json
+server/data/settings.json
+server/data/foods.json
+*.log
+.DS_Store
+.idea
