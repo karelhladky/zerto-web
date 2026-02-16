@@ -5,13 +5,25 @@ interface SettingsProps {
   onBack: () => void;
 }
 
+function isIos(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+function isStandalone(): boolean {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || ('standalone' in navigator && (navigator as any).standalone === true);
+}
+
 export default function Settings({ onBack: _onBack }: SettingsProps) {
   const [notifyDays, setNotifyDays] = useState(3);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported] = useState('serviceWorker' in navigator && 'PushManager' in window);
+  const [swReady, setSwReady] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [isError, setIsError] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -19,10 +31,15 @@ export default function Settings({ onBack: _onBack }: SettingsProps) {
         const settings = await api.getSettings();
         setNotifyDays(settings.notifyDaysBefore);
 
-        // Check push subscription status
         if (pushSupported) {
-          const reg = await navigator.serviceWorker.getRegistration();
+          // Check if SW is registered (with timeout)
+          const reg = await Promise.race([
+            navigator.serviceWorker.getRegistration(),
+            new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), 3000)),
+          ]);
+
           if (reg) {
+            setSwReady(true);
             const sub = await reg.pushManager.getSubscription();
             setPushEnabled(!!sub);
           }
@@ -36,47 +53,67 @@ export default function Settings({ onBack: _onBack }: SettingsProps) {
     load();
   }, [pushSupported]);
 
+  const showMessage = (msg: string, error = false) => {
+    setMessage(msg);
+    setIsError(error);
+    setTimeout(() => setMessage(null), 4000);
+  };
+
   const handleSaveDays = async () => {
     try {
       setSaving(true);
       await api.updateSettings({ notifyDaysBefore: notifyDays });
-      setMessage('Uloženo!');
-      setTimeout(() => setMessage(null), 2000);
+      showMessage('Uloženo!');
     } catch {
-      setMessage('Nepodařilo se uložit');
+      showMessage('Nepodařilo se uložit', true);
     } finally {
       setSaving(false);
     }
   };
 
   const handleTogglePush = async () => {
+    setSubscribing(true);
     try {
       if (pushEnabled) {
-        // Unsubscribe
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg) {
           const sub = await reg.pushManager.getSubscription();
           if (sub) await sub.unsubscribe();
         }
         setPushEnabled(false);
-        setMessage('Notifikace vypnuty');
+        showMessage('Notifikace vypnuty');
       } else {
-        // Subscribe
-        const reg = await navigator.serviceWorker.ready;
+        // Wait for SW to be ready (with timeout)
+        const reg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error('Service Worker se nepodařilo načíst. Zkus obnovit stránku.')), 5000)
+          ),
+        ]);
+
+        if (!reg) throw new Error('Service Worker není dostupný');
+
         const { publicKey } = await api.getVapidPublicKey();
 
-        const sub = await reg.pushManager.subscribe({
+        const sub = await (reg as ServiceWorkerRegistration).pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
 
         await api.subscribePush(sub.toJSON());
         setPushEnabled(true);
-        setMessage('Notifikace zapnuty!');
+        showMessage('Notifikace zapnuty!');
       }
-      setTimeout(() => setMessage(null), 2000);
     } catch (err: any) {
-      setMessage('Nepodařilo se nastavit notifikace: ' + (err.message || ''));
+      const msg = err?.message || String(err);
+
+      if (msg.includes('permission') || msg.includes('denied')) {
+        showMessage('Notifikace jsou v prohlížeči zablokované. Povol je v nastavení.', true);
+      } else {
+        showMessage('Chyba: ' + msg, true);
+      }
+    } finally {
+      setSubscribing(false);
     }
   };
 
@@ -84,9 +121,13 @@ export default function Settings({ onBack: _onBack }: SettingsProps) {
     return <div className="empty-state"><div className="spinner" /><p>Načítám...</p></div>;
   }
 
+  const showIosHint = isIos() && !isStandalone();
+
   return (
     <div className="settings">
-      {message && <div className="form-success">{message}</div>}
+      {message && (
+        <div className={isError ? 'form-error' : 'form-success'}>{message}</div>
+      )}
 
       <div className="settings-section">
         <h2>Upozornění na expiraci</h2>
@@ -113,16 +154,29 @@ export default function Settings({ onBack: _onBack }: SettingsProps) {
 
       <div className="settings-section">
         <h2>Push notifikace</h2>
-        {pushSupported ? (
+
+        {showIosHint && (
+          <div className="settings-ios-hint">
+            Pro push notifikace na iPhonu je potřeba přidat aplikaci na plochu:
+            klikni na <strong>Sdílet</strong> (ikona se šipkou) a pak <strong>Přidat na plochu</strong>.
+          </div>
+        )}
+
+        {pushSupported && swReady ? (
           <div className="settings-row">
             <span>{pushEnabled ? 'Zapnuto' : 'Vypnuto'}</span>
             <button
               className={`btn ${pushEnabled ? 'btn-secondary' : 'btn-primary'}`}
               onClick={handleTogglePush}
+              disabled={subscribing}
             >
-              {pushEnabled ? 'Vypnout' : 'Zapnout'}
+              {subscribing ? 'Zpracovávám...' : pushEnabled ? 'Vypnout' : 'Zapnout'}
             </button>
           </div>
+        ) : pushSupported && !swReady ? (
+          <p className="settings-note">
+            Service Worker se zatím nenačetl. Zkus obnovit stránku.
+          </p>
         ) : (
           <p className="settings-note">Push notifikace nejsou v tomto prohlížeči podporovány.</p>
         )}
