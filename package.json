@@ -1,7 +1,7 @@
 {
-  "name": "zerto-web",
+  "name": "moje-lednice",
   "version": "1.0.0",
-  "description": "Fridge food tracker with expiration notifications",
+  "description": "Sledování potravin v lednici s upozorněním na expiraci",
   "private": true,
   "scripts": {
     "dev:server": "cd server && npm run dev",

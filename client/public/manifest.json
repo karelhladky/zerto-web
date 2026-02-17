@@ -1,6 +1,6 @@
 {
-  "name": "ZerTo — Lednice",
-  "short_name": "ZerTo",
+  "name": "Moje lednice",
+  "short_name": "Moje lednice",
   "description": "Sledování potravin v lednici s upozorněním na expiraci",
   "start_url": "./",
   "display": "standalone",

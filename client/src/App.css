@@ -434,6 +434,17 @@ body {
   white-space: nowrap;
 }
 
+.settings-ios-hint {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: var(--blue-dark);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
 /* Barcode Scanner Input */
 .input-with-scan {
   display: flex;

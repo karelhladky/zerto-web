@@ -58,7 +58,7 @@ async function checkExpirations(): Promise<void> {
 
 export function startScheduler(): void {
   // Run every day at 9:00 AM
-  cron.schedule('* * * * *', () => {
+  cron.schedule('0 9 * * *', () => {
     console.log('[Scheduler] Running daily expiration check...');
     checkExpirations();
   });

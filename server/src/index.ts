@@ -1,5 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import { nanoid } from 'nanoid';
 import {
   getFoods,
@@ -180,6 +183,20 @@ app.get('/api/barcode/:code', async (req, res) => {
   }
 });
 
+// --- Serve frontend in production ---
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
+
+if (existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  // SPA fallback — all non-API routes serve index.html
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+  console.log('📦 Serving frontend from client/dist');
+}
+
 // --- Start server ---
 
 async function start() {
@@ -187,7 +204,7 @@ async function start() {
   startScheduler();
 
   app.listen(PORT, () => {
-    console.log(`🧊 ZerTo server running on http://localhost:${PORT}`);
+    console.log(`🧊 Moje lednice running on http://localhost:${PORT}`);
   });
 }
 

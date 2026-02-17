@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-globals */
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'ZerTo', body: 'Máte nové upozornění' };
+  let data = { title: 'Moje lednice', body: 'Máte nové upozornění' };
 
   try {
     if (event.data) {
@@ -16,7 +16,7 @@ self.addEventListener('push', (event) => {
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     vibrate: [200, 100, 200],
-    tag: 'zerto-expiration',
+    tag: 'moje-lednice-expiration',
     renotify: true,
   };
 
